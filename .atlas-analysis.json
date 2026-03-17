@@ -1,0 +1,40 @@
+{
+  "projectType": "general",
+  "projectName": "Typing Club Bot",
+  "projectDescription": "A browser console script that automates TypingClub lessons by simulating keystrokes and automatically advancing through levels to achieve full scores.",
+  "theme": "mint",
+  "primaryColor": "#242b2c",
+  "lightColor": null,
+  "darkColor": null,
+  "navigation": {
+    "groups": [
+      {
+        "group": "Get Started",
+        "pages": ["introduction", "quickstart"]
+      },
+      {
+        "group": "Usage",
+        "pages": ["usage/how-it-works", "usage/configuration"]
+      },
+      {
+        "group": "Reference",
+        "pages": ["reference/script-api", "reference/faq"]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Automated keystroke simulation for TypingClub lessons",
+    "Automatic level advancement after each lesson completes",
+    "Configurable typing delay to avoid detection",
+    "Handles special characters including ENTER key and non-breaking spaces",
+    "Uses TypingClub's internal API (window.core.record_keydown_time) for reliable input"
+  ],
+  "publicApiSurface": [
+    "autoPlay() — starts the automation loop for the current level",
+    "getTargetCharacters() — reads the characters to type from the DOM",
+    "recordKey(chr) — sends a keystroke to TypingClub's internal API",
+    "goToNextLevel() — clicks the next-level button and restarts autoPlay",
+    "sleep(ms) — promise-based delay helper",
+    "minDelay / maxDelay — configurable typing speed constants"
+  ]
+}
