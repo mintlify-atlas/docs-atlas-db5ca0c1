@@ -1,0 +1,143 @@
+---
+title: "Configuration"
+description: "All configurable values in TypingClubBot.js — typing speed, delays, and character overrides."
+---
+
+All configurable values are declared at the top of `TypingClubBot.js`. Edit these constants before pasting the script into the browser console.
+
+```javascript
+// NOTE: When delay (in ms between two strokes) is too low, the site might bug out
+// and the result page will not be shown
+const minDelay = 60;
+const maxDelay = 60;
+
+const keyOverrides = {
+  [String.fromCharCode(160)]: ' '    // convert hardspace to normal space
+};
+```
+
+<Warning>
+Do not set `minDelay` below approximately **60 ms**. When keystrokes arrive faster than TypingClub can process them, the site fails to register some inputs and the result screen does not appear. The level will not complete.
+</Warning>
+
+## Configuration reference
+
+| Variable | Default | Type | Effect |
+|---|---|---|---|
+| `minDelay` | `60` | number (ms) | Minimum time between two keystrokes |
+| `maxDelay` | `60` | number (ms) | Maximum time between two keystrokes |
+| `keyOverrides` | `{ [char 160]: ' ' }` | object | Maps specific characters to replacements before sending |
+| `setTimeout` delay in `goToNextLevel` | `2000` | number (ms) | How long to wait for the result screen before scanning for the → button |
+| `sleep(1000)` in `goToNextLevel` | `1000` | number (ms) | How long to wait for the next lesson page to load before restarting |
+
+## Typing speed — `minDelay` and `maxDelay`
+
+`minDelay` and `maxDelay` define the range of the random pause inserted between every two keystrokes. The actual delay for each keystroke is:
+
+```javascript
+Math.random() * (maxDelay - minDelay) + minDelay
+```
+
+When both values are equal (the default), the spread is zero and every keystroke fires at exactly that interval.
+
+<Tabs>
+  <Tab title="Fixed speed (default)">
+    Both constants set to the same value. Every keystroke fires at exactly 60 ms.
+
+    ```javascript
+    const minDelay = 60;
+    const maxDelay = 60;
+    ```
+  </Tab>
+  <Tab title="Variable speed">
+    Set different values to introduce a random spread. The bot will wait somewhere between 60 ms and 120 ms between each keystroke.
+
+    ```javascript
+    const minDelay = 60;
+    const maxDelay = 120;
+    ```
+  </Tab>
+  <Tab title="Slower (safer)">
+    Increase both values if TypingClub is still misbehaving at 60 ms on your connection or device.
+
+    ```javascript
+    const minDelay = 100;
+    const maxDelay = 150;
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+Higher delay values mean the bot takes longer to finish a lesson but are less likely to trigger any rate-limiting or rendering issues on the TypingClub side.
+</Note>
+
+## Character overrides — `keyOverrides`
+
+`keyOverrides` is a plain object used as a lookup table. Before each character is sent to the TypingClub API, it is checked against this object. If a match is found, the replacement value is sent instead.
+
+The default entry maps Unicode character 160 (non-breaking space) to a standard ASCII space:
+
+```javascript
+const keyOverrides = {
+  [String.fromCharCode(160)]: ' '    // convert hardspace to normal space
+};
+```
+
+To add a new mapping, add another key-value pair:
+
+```javascript
+const keyOverrides = {
+  [String.fromCharCode(160)]: ' ',   // non-breaking space → regular space
+  [String.fromCharCode(8217)]: "'"   // right single quotation mark → apostrophe
+};
+```
+
+The key must be the exact character (or the result of `String.fromCharCode(codePoint)`) and the value must be the character you want sent in its place.
+
+<Tip>
+To find the character code of an unexpected character, paste it into the browser console and run `'<character>'.charCodeAt(0)`. Use the result with `String.fromCharCode(...)` as the key in `keyOverrides`.
+</Tip>
+
+## Level transition delays
+
+Two separate delays control the pause between finishing a lesson and starting the next one. Both live inside `goToNextLevel`:
+
+```javascript
+function goToNextLevel() {
+  setTimeout(async () => {          // ← first delay: 2000 ms
+    const nextButton = Array.from(document.querySelectorAll('span')).find(
+      el => el.textContent === '→'
+    );
+    if (nextButton) {
+      nextButton.click();
+      console.log('Moving to next level...');
+
+      await sleep(1000);            // ← second delay: 1000 ms
+      autoPlay();
+    } else {
+      console.log('Next level button not found.');
+    }
+  }, 2000);
+}
+```
+
+### First delay — `setTimeout(..., 2000)`
+
+This 2-second pause starts immediately after the last keystroke is typed. It gives TypingClub time to process the final input, calculate the score, and render the result screen that contains the `→` button.
+
+Increase this value if the bot logs `Next level button not found.` even though a next-level button is eventually rendered — your connection or device may need more time to display the result screen.
+
+### Second delay — `sleep(1000)`
+
+This 1-second pause follows the click on the `→` button. It waits for the next lesson page to fully load and populate its DOM before `autoPlay` runs `getTargetCharacters`. If this delay is too short, the DOM query will return an empty array and the bot will immediately try to advance again rather than type the lesson.
+
+Increase this value on slow connections or if the bot appears to skip lessons.
+
+<CardGroup cols={2}>
+  <Card title="How it works" icon="gears" href="/usage/how-it-works">
+    Understand what each function does internally
+  </Card>
+  <Card title="Script API" icon="code" href="/reference/script-api">
+    Full reference for every function in the script
+  </Card>
+</CardGroup>

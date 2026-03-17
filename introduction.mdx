@@ -1,0 +1,60 @@
+---
+title: "Introduction"
+description: "Automate TypingClub lessons with a simple browser console script"
+---
+
+# Typing Club Bot
+
+Typing Club Bot is a lightweight JavaScript script that runs directly in your browser's developer console. It automates TypingClub lessons by simulating realistic keystrokes, advancing through levels automatically, and achieving perfect scores — all without any installation or setup beyond copy-pasting a script.
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get the bot running in under 2 minutes
+  </Card>
+  <Card title="How it works" icon="gears" href="/usage/how-it-works">
+    Understand the automation internals
+  </Card>
+  <Card title="Configuration" icon="sliders" href="/usage/configuration">
+    Tune typing speed and behavior
+  </Card>
+  <Card title="Script API" icon="code" href="/reference/script-api">
+    Full reference for every function
+  </Card>
+</CardGroup>
+
+## What it does
+
+Typing Club Bot reads the characters displayed in the current TypingClub lesson, sends each one to the site's internal keystroke API at a configurable interval, then automatically clicks the **next level** button when the lesson finishes — repeating this loop until all available levels are complete.
+
+<Note>
+The default typing delay is set to **60 ms** per keystroke. Do not lower this value; TypingClub may fail to register keystrokes that arrive too quickly and the result screen will not appear correctly.
+</Note>
+
+## Key features
+
+- **Zero installation** — runs entirely in the browser console, no npm or build step needed
+- **Full score automation** — reads every character from the DOM and submits it via TypingClub's internal `window.core.record_keydown_time` API
+- **Automatic level progression** — detects the next-level button and advances without manual interaction
+- **Special character handling** — correctly maps ENTER keys and non-breaking spaces (`\u00A0`) to their standard equivalents
+- **Configurable speed** — adjust `minDelay` and `maxDelay` to control the pace of typing
+
+## How to use
+
+<Steps>
+  <Step title="Open TypingClub">
+    Navigate to [typingclub.com](https://www.typingclub.com) and open the first lesson you want to automate.
+  </Step>
+  <Step title="Open the browser console">
+    Press `F12` (or `Cmd+Option+I` on Mac) and click the **Console** tab.
+  </Step>
+  <Step title="Paste and run the script">
+    Copy the full contents of `TypingClubBot.js` and paste it into the console, then press **Enter**.
+  </Step>
+  <Step title="Let it run">
+    The bot will type through the current lesson and automatically move to the next one. Plug in your laptop and let it complete all levels.
+  </Step>
+</Steps>
+
+## Credits
+
+This project is an extension of [Domiii's original TypingClub automation gist](https://gist.github.com/Domiii/52cf49d780ec8c9f01771973c36197af), with added automatic level advancement to complete entire lesson sets unattended.

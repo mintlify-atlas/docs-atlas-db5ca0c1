@@ -1,0 +1,215 @@
+---
+title: "Script API reference"
+description: "Complete reference for every constant and function in TypingClubBot.js"
+---
+
+This page documents every constant and function defined in `TypingClubBot.js`. The script runs entirely in the browser console — there are no imports, build steps, or external dependencies.
+
+## Constants
+
+### `minDelay`
+
+**Type:** `number` — default `60`
+
+The minimum number of milliseconds to wait between consecutive keystrokes. Combined with `maxDelay`, this defines the lower bound of the random delay range.
+
+```javascript
+const minDelay = 60;
+```
+
+<Warning>
+Do not set `minDelay` below `60`. If keystrokes arrive too quickly, TypingClub may fail to process them correctly and the result screen will not appear.
+</Warning>
+
+---
+
+### `maxDelay`
+
+**Type:** `number` — default `60`
+
+The maximum number of milliseconds to wait between consecutive keystrokes. When `minDelay` and `maxDelay` are equal, every keystroke waits exactly that many milliseconds.
+
+```javascript
+const maxDelay = 60;
+```
+
+<Tip>
+Set `maxDelay` higher than `minDelay` to introduce random variation in timing, which more closely resembles human typing.
+</Tip>
+
+---
+
+### `keyOverrides`
+
+**Type:** `object` — maps `string` → `string`
+
+A lookup table that translates special characters before they are submitted. Each key is a character that may appear in the DOM; the value is the replacement to use when calling `recordKey`.
+
+```javascript
+const keyOverrides = {
+  [String.fromCharCode(160)]: ' '    // convert hardspace to normal space
+};
+```
+
+Out of the box, the only override converts the non-breaking space (`U+00A0`, character code 160) to a regular space (`U+0020`). TypingClub sometimes renders spaces as non-breaking spaces in the DOM; this override ensures they are submitted correctly.
+
+---
+
+## Functions
+
+### `getTargetCharacters()`
+
+Reads the current lesson from the DOM and returns an ordered array of the characters that need to be typed.
+
+**Parameters:** none
+
+**Returns:** `string[]` — one entry per character in the lesson, in display order.
+
+```javascript
+function getTargetCharacters() {
+  const els = Array.from(document.querySelectorAll('.token span.token_unit'));
+  const chrs = els
+    .map(el => {
+      if (el.firstChild?.classList?.contains('_enter')) {
+        return '\n';
+      }
+      let text = el.textContent[0];
+      return text;
+    })
+    .map(c => keyOverrides.hasOwnProperty(c) ? keyOverrides[c] : c);
+  return chrs;
+}
+```
+
+**Behavior notes:**
+
+- Queries `.token span.token_unit` elements — the DOM structure TypingClub uses for individual characters in a lesson.
+- Detects the Enter key by checking whether the first child element has the `_enter` CSS class, and maps it to `'\n'`.
+- Applies `keyOverrides` to every character after reading it from the DOM.
+- If the lesson contains no `.token span.token_unit` elements, returns an empty array (`[]`), which causes `autoPlay` to skip directly to `goToNextLevel`.
+
+---
+
+### `recordKey(chr)`
+
+Submits a single keystroke directly to TypingClub's internal API.
+
+**Parameters:**
+
+| Name  | Type     | Description                   |
+| ----- | -------- | ----------------------------- |
+| `chr` | `string` | The character to submit.      |
+
+**Returns:** `void`
+
+```javascript
+function recordKey(chr) {
+  window.core.record_keydown_time(chr);
+}
+```
+
+**Behavior notes:**
+
+- Calls `window.core.record_keydown_time`, which is a function exposed by TypingClub on the global `window.core` object. This is the same path the site uses internally when a real key is pressed.
+- Does not dispatch synthetic DOM keyboard events. The keystroke goes straight to the site's scoring logic.
+
+<Note>
+`window.core` is only available on lesson pages. Calling `recordKey` from any other page will throw a `TypeError`.
+</Note>
+
+---
+
+### `sleep(ms)`
+
+Returns a `Promise` that resolves after the given number of milliseconds.
+
+**Parameters:**
+
+| Name | Type     | Description                         |
+| ---- | -------- | ----------------------------------- |
+| `ms` | `number` | Duration to wait, in milliseconds.  |
+
+**Returns:** `Promise<void>`
+
+```javascript
+function sleep(ms) {
+  return new Promise(r => setTimeout(r, ms));
+}
+```
+
+**Behavior notes:**
+
+- A thin wrapper around `setTimeout` for use with `await` inside async functions.
+- Used by both `autoPlay` (between keystrokes) and `goToNextLevel` (before calling `autoPlay` on the next level).
+
+---
+
+### `autoPlay()`
+
+The main entry point. Reads all characters from the current lesson, types each one with a random delay, then advances to the next level.
+
+**Parameters:** none
+
+**Returns:** `Promise<void>`
+
+```javascript
+async function autoPlay() {
+  const chrs = getTargetCharacters();
+  if (chrs.length === 0) {
+    goToNextLevel();
+    return;
+  }
+
+  for (let i = 0; i < chrs.length; ++i) {
+    const c = chrs[i];
+    recordKey(c);
+    await sleep(Math.random() * (maxDelay - minDelay) + minDelay);
+  }
+
+  goToNextLevel();
+}
+```
+
+**Behavior notes:**
+
+- Calls `getTargetCharacters()` once at the start. Characters are snapshot at invocation time; any DOM changes during typing are not reflected.
+- If the character array is empty (for example, a non-typing lesson), it calls `goToNextLevel()` immediately and returns.
+- The delay between each keystroke is `Math.random() * (maxDelay - minDelay) + minDelay`, which produces a uniformly distributed random value in `[minDelay, maxDelay]`. When both constants are equal, the delay is exactly `minDelay` every time.
+- After all characters are typed, calls `goToNextLevel()` to advance. This call is not awaited — `goToNextLevel` uses `setTimeout` internally and returns synchronously.
+
+---
+
+### `goToNextLevel()`
+
+Waits for the lesson result screen to appear, clicks the next-level button, then calls `autoPlay()` recursively to begin the following lesson.
+
+**Parameters:** none
+
+**Returns:** `void`
+
+```javascript
+function goToNextLevel() {
+  setTimeout(async () => {
+    const nextButton = Array.from(document.querySelectorAll('span')).find(
+      el => el.textContent === '→'
+    );
+    if (nextButton) {
+      nextButton.click();
+      console.log('Moving to next level...');
+
+      await sleep(1000);
+      autoPlay();
+    } else {
+      console.log('Next level button not found.');
+    }
+  }, 2000);
+}
+```
+
+**Behavior notes:**
+
+- The outer `setTimeout` waits **2000 ms** before searching for the button. This gives TypingClub time to finish animating and display the result screen.
+- Locates the next-level button by scanning all `<span>` elements for one whose `textContent` is exactly `'→'`.
+- If the button is found: clicks it, logs `'Moving to next level...'` to the console, waits **1000 ms** for the next lesson to load, then calls `autoPlay()` to begin typing.
+- If the button is not found: logs `'Next level button not found.'` and stops. No retry logic is applied.
+- `autoPlay` and `goToNextLevel` call each other recursively, forming a loop that continues until the next-level button is absent (for example, at the end of a lesson set).

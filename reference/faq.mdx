@@ -1,0 +1,110 @@
+---
+title: "FAQ"
+description: "Answers to common questions about running TypingClubBot"
+---
+
+<AccordionGroup>
+  <Accordion title="Why doesn't the result screen appear?">
+    The delay between keystrokes is too low. TypingClub processes keystrokes asynchronously; if they arrive faster than the site can handle them, the internal state gets out of sync and the result screen is never triggered.
+
+    Keep `minDelay` at `60` or higher:
+
+    ```javascript
+    const minDelay = 60;
+    const maxDelay = 60;
+    ```
+
+    <Warning>
+    Setting `minDelay` below `60` is the most common cause of the bot appearing to complete a lesson but the score screen never showing. Do not lower this value.
+    </Warning>
+  </Accordion>
+
+  <Accordion title="The bot typed through the whole lesson but didn't advance — why?">
+    The `→` next-level button was not found when `goToNextLevel` searched for it. This usually happens because the result screen hadn't finished loading within the 2-second window.
+
+    Try increasing the `setTimeout` delay inside `goToNextLevel`:
+
+    ```javascript
+    function goToNextLevel() {
+      setTimeout(async () => {
+        // increase 2000 to 3000 or higher if the result screen loads slowly
+        const nextButton = Array.from(document.querySelectorAll('span')).find(
+          el => el.textContent === '→'
+        );
+        // ...
+      }, 3000); // was 2000
+    }
+    ```
+
+    You can also increase the `await sleep(1000)` on the line after `nextButton.click()` if the following lesson takes longer to load.
+  </Accordion>
+
+  <Accordion title="Does this work on all lesson types?">
+    It works on standard text-typing lessons — the kind where TypingClub renders individual characters as `.token span.token_unit` elements in the DOM.
+
+    Lessons with a different DOM structure (for example, video lessons, games, or intro screens) will return an empty character array. When that happens, the bot calls `goToNextLevel()` immediately and skips to the next lesson.
+
+    <Note>
+    If you encounter a lesson type that causes the bot to loop or stall, refresh the page to stop execution and advance manually.
+    </Note>
+  </Accordion>
+
+  <Accordion title="Will TypingClub detect this?">
+    The script uses TypingClub's own internal API (`window.core.record_keydown_time`) — the same function the site calls when you press a real key. No synthetic keyboard events are dispatched.
+
+    Keeping delays at 60 ms produces a typing speed of roughly 1000 characters per minute, which is within the range of a fast human typist. Unusually high scores may attract attention, but the mechanism itself is indistinguishable from normal input at the API level.
+
+    <Info>
+    Use this script responsibly and in accordance with your school or organization's acceptable use policy.
+    </Info>
+  </Accordion>
+
+  <Accordion title="Can I stop it mid-run?">
+    Yes. Refresh the page or close the tab. The script has no persistent state — it is not a browser extension, service worker, or background process. Once the page reloads, the script is gone.
+
+    There is no built-in pause or stop command; a page refresh is the simplest way to halt execution.
+  </Accordion>
+
+  <Accordion title="Does it save progress?">
+    Yes. TypingClub saves lesson results server-side as soon as a lesson completes, exactly as it would if you typed manually. The bot submits keystrokes through the same internal API, so the site treats the result as a normal completion.
+  </Accordion>
+
+  <Accordion title="Can I run it for just one level?">
+    Yes. Remove the `goToNextLevel()` call at the end of `autoPlay` to stop after the current lesson finishes:
+
+    ```javascript
+    async function autoPlay() {
+      const chrs = getTargetCharacters();
+      if (chrs.length === 0) {
+        // goToNextLevel();  <-- remove or comment out
+        return;
+      }
+
+      for (let i = 0; i < chrs.length; ++i) {
+        const c = chrs[i];
+        recordKey(c);
+        await sleep(Math.random() * (maxDelay - minDelay) + minDelay);
+      }
+
+      // goToNextLevel();  <-- remove or comment out
+    }
+    ```
+
+    The bot will type through the current lesson and then stop.
+  </Accordion>
+
+  <Accordion title="What browsers support this?">
+    Any modern browser that provides a JavaScript console:
+
+    - Chrome
+    - Firefox
+    - Edge
+    - Safari
+
+    Open the console with `F12` (Windows/Linux) or `Cmd+Option+I` (Mac), paste the script into the **Console** tab, and press **Enter**.
+
+    <Tip>
+    Chrome's console provides the most reliable DevTools experience for this workflow. If you encounter issues in another browser, try Chrome first.
+    </Tip>
+  </Accordion>
+</AccordionGroup>

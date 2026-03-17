@@ -1,80 +1,139 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: 'Quickstart'
+description: 'Get the TypingClub Bot running in under 2 minutes.'
 ---
 
-## Get started in three steps
+## Prerequisites
 
-Get your documentation site running locally and make your first customization.
+- A web browser (Chrome, Firefox, or Edge)
+- A [TypingClub](https://www.typingclub.com) account
 
-### Step 1: Set up your local environment
+## Run the bot
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+<Steps>
+  <Step title="Open a lesson">
+    Log in to [typingclub.com](https://www.typingclub.com), navigate to any course, and open a lesson level. The bot works on individual typing lesson pages.
+  </Step>
 
-### Step 2: Deploy your changes
+  <Step title="Open the browser console">
+    Press `F12` (or `Cmd+Option+J` on Mac) to open DevTools, then click the **Console** tab.
+  </Step>
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+  <Step title="Paste and run the script">
+    Copy the full script below, paste it into the console prompt, and press `Enter`.
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+    ```javascript TypingClubBot.js
+    // NOTE: When delay (in ms between two strokes) is too low, the site might bug out and the result page will not be shown
+    const minDelay = 60;
+    const maxDelay = 60;
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+    const keyOverrides = {
+      [String.fromCharCode(160)]: ' '    // convert hardspace to normal space
+    };
 
-### Step 3: Go live
+    function getTargetCharacters() {
+      const els = Array.from(document.querySelectorAll('.token span.token_unit'));
+      const chrs = els
+        .map(el => {
+          // get letter to type from each letter DOM element
+          if (el.firstChild?.classList?.contains('_enter')) {
+            // special case: ENTER
+            return '\n';
+          }
+          let text = el.textContent[0];
+          return text;
+        })
+        .map(c => keyOverrides.hasOwnProperty(c) ? keyOverrides[c] : c); // convert special characters
+      return chrs;
+    }
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+    function recordKey(chr) {
+      // send it straight to the internal API
+      window.core.record_keydown_time(chr);
+    }
+
+    function sleep(ms) {
+      return new Promise(r => setTimeout(r, ms));
+    }
+
+    async function autoPlay() {
+      const chrs = getTargetCharacters();
+      if (chrs.length === 0) {
+        // No characters to type, move to the next level
+        goToNextLevel();
+        return;
+      }
+
+      for (let i = 0; i < chrs.length; ++i) {
+        const c = chrs[i];
+        recordKey(c);
+        await sleep(Math.random() * (maxDelay - minDelay) + minDelay);
+      }
+
+      // After auto-typing ends, automatically move to the next level
+      goToNextLevel();
+    }
+
+    // Function to click the button that moves to the next level
+    function goToNextLevel() {
+      // Wait a bit after typing before attempting to go to the next level
+      setTimeout(async () => {
+        const nextButton = Array.from(document.querySelectorAll('span')).find(el => el.textContent === '\u2192');
+        if (nextButton) {
+          nextButton.click(); // Simulate click to proceed to the next level
+          console.log('Moving to next level...');
+
+          // Wait for the next level to load before starting the typing again
+          await sleep(1000); // Adjust this delay if necessary
+          autoPlay(); // Call autoPlay again for the next level
+        } else {
+          console.log('Next level button not found.');
+        }
+      }, 2000); // Adjust the delay before going to the next level if needed
+    }
+
+    autoPlay();
+    ```
+  </Step>
+</Steps>
+
+## What to expect
+
+Once the script runs, it reads all the target characters from the current lesson page using `.token span.token_unit` elements and types them one by one by calling `window.core.record_keydown_time()` — TypingClub's internal keystroke API.
+
+After all characters are typed, the bot waits 2 seconds and then looks for the `→` navigation button to advance to the next level. You will see the following messages in the console as it progresses:
+
+```
+Moving to next level...
+```
+
+If the next level button is not found (for example, at the end of a course), you will see:
+
+```
+Next level button not found.
+```
+
+The bot then continues calling `autoPlay()` on each subsequent level automatically, chaining through lessons without any manual input.
+
+<Note>
+  The default delay between keystrokes is **60ms** (`minDelay = 60`, `maxDelay = 60`). Do not set this value below 60ms. If the delay is too low, TypingClub may fail to register keystrokes correctly and the results page will not be shown.
+</Note>
+
+<Tip>
+  Keep your laptop plugged in while the bot runs. It can chain through many levels in a single session, and the browser staying active throughout ensures the script is not interrupted by power-saving sleep.
+</Tip>
+
+<Warning>
+  The bot runs entirely in your browser session and requires the lesson page to remain open and in focus. Do not navigate away or close the tab while it is running.
+</Warning>
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
-
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Configuration" icon="sliders" href="/usage/configuration">
+    Adjust typing speed, delays, and key override mappings.
+  </Card>
+  <Card title="How it works" icon="code" href="/usage/how-it-works">
+    Understand the internal API calls and DOM selectors the bot relies on.
+  </Card>
 </CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>
